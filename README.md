@@ -1,2 +1,2 @@
 # owmp
-Openwrt WAN Management Protocol (CWMP)
+Openwrt WAN Management Protocol (OWMP)
