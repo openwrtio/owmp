@@ -46,8 +46,10 @@ if [ $? -ne 0 ]; then
 fi
 json_get_var channel channel
 json_get_var txpower txpower
+json_get_var disabled disabled
 echo "$channel"
 echo "$txpower"
+echo "$disabled"
 
 # todo: read define from make menuconfig
 wifi_txpower='txpower'
@@ -73,6 +75,14 @@ if [ $old_channel != $channel ]; then
     uci set wireless.$wifi_device.channel=$channel
     wifi_need_restart=1
 fi
+
+cmd="uci get wireless.$wifi_device.disabled"
+old_disabled=`eval $cmd`
+if [ "$old_disabled" != "$disabled" ]; then
+    uci set wireless.$wifi_device.disabled=$disabled
+    wifi_need_restart=1
+fi
+
 cmd="uci get wireless.$wifi_device.$wifi_txpower"
 old_txpower=`eval $cmd`
 if [ "$old_txpower" != "$txpower" ]; then
@@ -95,6 +105,7 @@ if [ "$old_ssid" != "$ssid" ]; then
     uci set wireless.$wifi_iface.ssid=$ssid
     wifi_need_restart=1
 fi
+
 cmd="uci get wireless.$wifi_iface.encryption"
 old_encryption=`eval $cmd`
 if [ "$old_encryption" != "$encryption" ]; then
@@ -252,8 +263,9 @@ fi
 
 if [ $wifidog_need_restart -eq 1 ]; then
     echo '---------------------'
-    echo 'wifidog restarting'
-    /etc/init.d/wifidog restart
+    echo 'wifidog stop and start'
+    /etc/init.d/wifidog stop
+    /etc/init.d/wifidog start
 fi
 
 r=`curl -sH 'Accept: application/json; version='$api_version -A 'HiAC/0.1.0 (Linux; OpenWrt 14.07; Hiwifi_J1S/HC6361)' $server_http_api'devices/'$lan_mac'/config/shadow'`
