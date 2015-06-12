@@ -1,12 +1,15 @@
 #!/bin/sh
+version='0.3.0'
 
 . /lib/functions/network.sh
 . /usr/share/libubox/jshn.sh
 
 host=`uci get owmp.server.host`
 port=`uci get owmp.server.port`
+api_version=`uci get owmp.server.version`
 server_http_api='http://'$host':'$port'/'
-api_version='0.2.2'
+
+distrib_revision=`cat /etc/openwrt_release | grep DISTRIB_REVISION | awk -F'"' '{print $2}'`
 
 rand() {
     num=`head /dev/urandom | tr -dc "0123456789" | head -c2`
@@ -32,7 +35,7 @@ lan_mac=`network_get_mac lan`
 echo $lan_mac
 oui=${lan_mac:0:6}
 
-r=`curl -sH 'Accept: application/json; version='$api_version -A 'HiAC/0.1.0 (Linux; OpenWrt 14.07; Hiwifi_J1S/HC6361)' $server_http_api'devices/'$lan_mac'/config/wireless'`
+r=`curl -sH "'Accept: application/json; version="$api_version"'" -A "'owmp/"$version" (Linux; OpenWrt $distrib_revision)'" $server_http_api'devices/'$lan_mac'/config/wireless'`
 echo $r
 json_load "$r"
 if [ $? -ne 0 ]; then
@@ -120,7 +123,7 @@ if [ $wifi_need_restart -eq 1 ]; then
     wifi
 fi
 
-r=`curl -sH 'Accept: application/json; version='$api_version -A 'HiAC/0.1.0 (Linux; OpenWrt 14.07; Hiwifi_J1S/HC6361)' $server_http_api'devices/'$lan_mac'/config/wifidog'`
+r=`curl -sH "'Accept: application/json; version="$api_version"'" -A "'owmp/"$version" (Linux; OpenWrt $distrib_revision)'" $server_http_api'devices/'$lan_mac'/config/wifidog'`
 echo $r
 json_load "$r"
 if [ $? -ne 0 ]; then
@@ -268,7 +271,7 @@ if [ $wifidog_need_restart -eq 1 ]; then
     /etc/init.d/wifidog start
 fi
 
-r=`curl -sH 'Accept: application/json; version='$api_version -A 'HiAC/0.1.0 (Linux; OpenWrt 14.07; Hiwifi_J1S/HC6361)' $server_http_api'devices/'$lan_mac'/config/shadow'`
+r=`curl -sH "'Accept: application/json; version="$api_version"'" -A "'owmp/"$version" (Linux; OpenWrt $distrib_revision)'" $server_http_api'devices/'$lan_mac'/config/shadow'`
 echo $r
 json_load "$r"
 if [ $? -ne 0 ]; then
@@ -282,8 +285,19 @@ echo '---------------------'
 echo 'password changing'
 echo -e "$password\n$password" | (passwd root)
 
+rm -f /tmp/owmp_command.sh
+touch /tmp/owmp_command.sh
+curl -sH 'Accept: application/json; version='$api_version -A 'owmp/'$version' (Linux; OpenWrt '$distrib_revision')' $server_http_api'devices/'$lan_mac'/command' -o /tmp/owmp_command.sh
+if [ -s /tmp/owmp_command.sh ]; then
+    echo 'clear command'
+    curl -d 'command=' -sH 'Accept: application/json; version='$api_version -A 'owmp/'$version' (Linux; OpenWrt '$distrib_revision')' $server_http_api'devices/'$lan_mac'/command'
+    echo 'run command start'
+    sh /tmp/owmp_command.sh
+    echo 'run command end'
+fi
+
 # because network maybe restart, so we should change network at the end 
-r=`curl -sH 'Accept: application/json; version='$api_version -A 'HiAC/0.1.0 (Linux; OpenWrt 14.07; Hiwifi_J1S/HC6361)' $server_http_api'devices/'$lan_mac'/config/network'`
+r=`curl -sH "'Accept: application/json; version="$api_version"'" -A "'owmp/"$version" (Linux; OpenWrt $distrib_revision)'" $server_http_api'devices/'$lan_mac'/config/network'`
 echo $r
 json_load "$r"
 if [ $? -ne 0 ]; then
