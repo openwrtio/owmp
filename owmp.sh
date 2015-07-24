@@ -123,7 +123,7 @@ if [ $wifi_need_restart -eq 1 ]; then
     wifi
 fi
 
-r=`curl -sH "'Accept: application/json; version="$api_version"'" -A "'owmp/"$version" (Linux; OpenWrt $distrib_revision)'" $server_http_api'devices/'$lan_mac'/config/wifidog'`
+r=`curl -sH "Accept: application/json; version=$api_version" -A "owmp/$version (Linux; OpenWrt $distrib_revision)" $server_http_api'devices/'$lan_mac'/config/wifidog'`
 echo $r
 json_load "$r"
 if [ $? -ne 0 ]; then
@@ -140,17 +140,22 @@ json_get_var path path
 echo "$hostname"
 echo "$path"
 
+wifidog_need_commit=0
 wifidog_need_restart=0
 if [ -f /etc/config/wifidog ]; then
     old_hostname=`uci get wifidog.authserver.Hostname`
-    if [ $old_hostname != $hostname ]; then
+    if [ x"$old_hostname" != x"$hostname" ]; then
+        echo 'hostname is diff'
         uci set wifidog.authserver.Hostname=$hostname
+        wifidog_need_commit=1
         wifidog_need_restart=1
     fi
 
     old_path=`uci get wifidog.authserver.Path`
-    if [ $old_path != $path ]; then
+    if [ x"$old_path" != x"$path" ]; then
+        echo 'path is diff'
         uci set wifidog.authserver.Path=$path
+        wifidog_need_commit=1
         wifidog_need_restart=1
     fi
 else
@@ -218,7 +223,7 @@ if [ -f /etc/config/wifidog ]; then
         for domain in $domain_whitelist; do
             uci add_list wifidog.hostlist.host=$domain
         done
-        uci commit wifidog
+        wifidog_need_commit=1
         wifidog_need_restart=1
     fi
     old_ip_whitelist=`uci get wifidog.iplist.ip`
@@ -228,7 +233,7 @@ if [ -f /etc/config/wifidog ]; then
         for ip in $ip_whitelist; do
             uci add_list wifidog.iplist.ip=$ip
         done
-        uci commit wifidog
+        wifidog_need_commit=1
         wifidog_need_restart=1
     fi
 else
@@ -262,6 +267,40 @@ else
         done
         echo '}' >> /etc/wifidog.conf
     fi
+fi
+
+json_select ..
+json_select mac_whitelist
+if [ $? -ne 0 ]; then
+    echo 'error: json_select error'
+    exit 1
+else
+    i=1
+    mac_whitelist=''
+    while json_get_type type $i && [ "$type" = string ]; do
+        json_get_var tmp "$((i++))"
+        mac_whitelist=`echo $mac_whitelist $tmp`
+    done
+    echo 'mac_whitelist: '
+    echo "$mac_whitelist"
+
+    if [ -f /etc/config/wifidog ]; then
+        old_mac_whitelist=`uci get wifidog.maclist.mac`
+        if [ "$old_mac_whitelist" != "$mac_whitelist" ]; then
+            echo "mac_whitelist is diff"
+            uci delete wifidog.maclist.mac
+            i=1
+            for mac in $mac_whitelist; do
+                uci add_list wifidog.maclist.mac=$mac
+            done
+            wifidog_need_commit=1
+            wifidog_need_restart=1
+        fi
+    fi
+fi
+
+if [ $wifidog_need_commit -eq 1 ]; then
+    uci commit wifidog
 fi
 
 if [ $wifidog_need_restart -eq 1 ]; then
